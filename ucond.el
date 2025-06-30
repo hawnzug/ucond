@@ -111,6 +111,43 @@ translated by the algorithm in the documentation of `ucond--core'."
             (,pattern ,(ucond--core-expand nested-cases rest))
             (_ ,rest)))))))
 
+(defmacro ucond--bindings (&rest cases)
+  "Allow multiple bindings for CASES in `ucond-core'."
+  (cons 'ucond--core (ucond--bindings-expand cases)))
+
+(defun ucond--bindings-expand (cases)
+  (when cases
+    (let ((rest (ucond--bindings-expand (cdr cases))))
+      (pcase (car cases)
+        (`(case ,bindings . ,then)
+         (cons (ucond--bindings-case-expand bindings 'case then)
+               rest))
+        (`(case-and-cond ,bindings . ,nested-cases)
+         (cons (ucond--bindings-case-expand
+                bindings 'case-and-cond
+                (ucond--bindings-expand nested-cases))
+               rest))
+        (`(let-else ,bindings . ,else)
+         (append
+          (cl-loop
+           for binding in bindings
+           collect (pcase binding
+                     (`(,pattern ,expr)
+                      `(let-else ,pattern ,expr ,@else))
+                     (_ (error "Unknown binding"))))
+          rest))))))
+
+(defun ucond--bindings-case-expand (bindings end code)
+  "Expand BINDINGS to and-cond followed by END CODE."
+  (pcase bindings
+    (`((,pattern ,expr))
+     `(,end ,pattern ,expr ,@code))
+    (`((,pattern ,expr) . ,rest-bindings)
+     `(case-and-cond
+       ,pattern ,expr
+       ,(ucond--bindings-case-expand rest-bindings end code)))
+    (_ (error "Unknown binding"))))
+
 (provide 'ucond)
 
 ;;; ucond.el ends here
