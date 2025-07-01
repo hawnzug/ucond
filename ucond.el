@@ -166,6 +166,9 @@ translated by the algorithm in the documentation of `ucond--core'."
     (`(case ,expr . ,rest)
      (ucond--clause-and-desugar
       '((_ t)) `(:and-ucond-case ,expr ,@rest)))
+    (`(cond . ,rest)
+     (ucond--clause-and-desugar
+      '((_ t)) `(:and-ucond ,@rest)))
     (`(_ . ,rest) `(case ((_ nil)) ,@rest))
     (_ (error "Unknown clause"))))
 
@@ -210,6 +213,9 @@ translated by the algorithm in the documentation of `ucond--core'."
     (`(case ,expr . ,rest)
      (ucond--clause-and-desugar
       '((_ t)) `(:and-ucond-case ,expr ,@rest)))
+    (`(cond . ,rest)
+     (ucond--clause-and-desugar
+      '((_ t)) `(:and-ucond ,@rest)))
     (`(,pattern . ,rest)
      (ucond--clause-and-desugar `((,pattern ,exprsym)) rest))
     (_ (error "Unknown clause"))))
