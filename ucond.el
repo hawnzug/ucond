@@ -158,24 +158,54 @@ translated by the algorithm in the documentation of `ucond--core'."
 
 (defun ucond--clause-desugar (clause)
   (pcase clause
-    (`(let* ,bindings . ,rest)
+    (`(let* . ,rest) (ucond--clause-let*-desugar rest))
+    (`(match* ,bindings . ,rest)
+     (ucond--clause-case-desugar bindings rest))
+    (`(when ,condition . ,rest)
+     (ucond--clause-case-desugar `(((guard ,condition) nil)) rest))
+    (`(_ . ,rest) `(case ((_ nil)) ,@rest))
+    (_ (error "Unknown clause"))))
+
+(defun ucond--clause-let*-desugar (rest)
+  ;; Unfortunately we cannot use ucond now.
+  (pcase rest
+    (`(,bindings . ,rest)
      (let ((else (pcase rest
                    ('nil nil)
                    (`(:otherwise . ,else) else)
                    (_ (error "Missing :otherwise in let")))))
        `(let-else ,bindings ,@else)))
-    (`(match* ,bindings . ,rest)
-     (pcase rest
-       (`(:and-ucond . ,cases)
-        `(case-and-cond ,bindings ,@(ucond--clauses-expand cases)))
-       (_ `(case ,bindings ,@rest))))
-    (`(when ,condition . ,rest)
-     (let ((bindings `(((guard ,condition) nil))))
-       (pcase rest
-         (`(:and-ucond . ,cases)
-          `(case-and-cond ,bindings ,@(ucond--clauses-expand cases)))
-         (_ `(case ,bindings ,@rest)))))
-    (`(_ . ,rest) `(case ((_ nil)) ,@rest))
+    (_ (error "Unknown let* clause"))))
+
+(defun ucond--clause-case-desugar (bindings rest)
+  (pcase rest
+    (`(:and-ucond . ,cases)
+     `(case-and-cond ,bindings ,@(ucond--clauses-expand cases)))
+    (`(:and-ucond-case ,expr . ,cases)
+     `(case-and-cond ,bindings
+                     ,@(ucond-case--clauses-expand expr cases)))
+    (_ `(case ,bindings ,@rest))))
+
+(defmacro ucond-case (expr &rest clauses)
+  "TODO: Documentation."
+  (declare (indent 1))
+  (cons 'ucond--bindings
+        (ucond-case--clauses-expand expr clauses)))
+
+(defun ucond-case--clauses-expand (expr clauses)
+  (let* ((const (macroexp-const-p expr))
+         (sym (if const expr (make-symbol "var")))
+         (clauses-1 (if const clauses
+                      (cons `(let* ((,sym ,expr))) clauses))))
+    (cl-loop
+     for clause in clauses-1
+     collect (ucond-case--clause-desugar sym clause))))
+
+(defun ucond-case--clause-desugar (exprsym clause)
+  (pcase clause
+    (`(let* . ,rest) (ucond--clause-let*-desugar rest))
+    (`(,pattern . ,rest)
+     (ucond--clause-case-desugar `((,pattern ,exprsym)) rest))
     (_ (error "Unknown clause"))))
 
 (provide 'ucond)
