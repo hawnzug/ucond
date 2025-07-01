@@ -160,9 +160,12 @@ translated by the algorithm in the documentation of `ucond--core'."
   (pcase clause
     (`(let* . ,rest) (ucond--clause-let*-desugar rest))
     (`(match* ,bindings . ,rest)
-     (ucond--clause-case-desugar bindings rest))
+     (ucond--clause-and-desugar bindings rest))
     (`(when ,condition . ,rest)
-     (ucond--clause-case-desugar `(((guard ,condition) nil)) rest))
+     (ucond--clause-and-desugar `(((guard ,condition) nil)) rest))
+    (`(case ,expr . ,rest)
+     (ucond--clause-and-desugar
+      '((_ t)) `(:and-ucond-case ,expr ,@rest)))
     (`(_ . ,rest) `(case ((_ nil)) ,@rest))
     (_ (error "Unknown clause"))))
 
@@ -177,7 +180,7 @@ translated by the algorithm in the documentation of `ucond--core'."
        `(let-else ,bindings ,@else)))
     (_ (error "Unknown let* clause"))))
 
-(defun ucond--clause-case-desugar (bindings rest)
+(defun ucond--clause-and-desugar (bindings rest)
   (pcase rest
     (`(:and-ucond . ,cases)
      `(case-and-cond ,bindings ,@(ucond--clauses-expand cases)))
@@ -204,8 +207,11 @@ translated by the algorithm in the documentation of `ucond--core'."
 (defun ucond-case--clause-desugar (exprsym clause)
   (pcase clause
     (`(let* . ,rest) (ucond--clause-let*-desugar rest))
+    (`(case ,expr . ,rest)
+     (ucond--clause-and-desugar
+      '((_ t)) `(:and-ucond-case ,expr ,@rest)))
     (`(,pattern . ,rest)
-     (ucond--clause-case-desugar `((,pattern ,exprsym)) rest))
+     (ucond--clause-and-desugar `((,pattern ,exprsym)) rest))
     (_ (error "Unknown clause"))))
 
 (provide 'ucond)
