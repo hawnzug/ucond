@@ -163,10 +163,10 @@ translated by the algorithm in the documentation of `ucond--core'."
      (ucond--clause-and-desugar bindings rest))
     (`(when ,condition . ,rest)
      (ucond--clause-and-desugar `(((guard ,condition) nil)) rest))
-    (`(case ,expr . ,rest)
+    (`(ucase ,expr . ,rest)
      (ucond--clause-and-desugar
-      '((_ t)) `(:and-ucond-case ,expr ,@rest)))
-    (`(cond . ,rest)
+      '((_ t)) `(:and-ucase ,expr ,@rest)))
+    (`(ucond . ,rest)
      (ucond--clause-and-desugar
       '((_ t)) `(:and-ucond ,@rest)))
     (`(_ . ,rest) `(case ((_ nil)) ,@rest))
@@ -187,33 +187,33 @@ translated by the algorithm in the documentation of `ucond--core'."
   (pcase rest
     (`(:and-ucond . ,cases)
      `(case-and-cond ,bindings ,@(ucond--clauses-expand cases)))
-    (`(:and-ucond-case ,expr . ,cases)
+    (`(:and-ucase ,expr . ,cases)
      `(case-and-cond ,bindings
-                     ,@(ucond-case--clauses-expand expr cases)))
+                     ,@(ucase--clauses-expand expr cases)))
     (_ `(case ,bindings ,@rest))))
 
-(defmacro ucond-case (expr &rest clauses)
+(defmacro ucase (expr &rest clauses)
   "TODO: Documentation."
   (declare (indent 1))
   (cons 'ucond--bindings
-        (ucond-case--clauses-expand expr clauses)))
+        (ucase--clauses-expand expr clauses)))
 
-(defun ucond-case--clauses-expand (expr clauses)
+(defun ucase--clauses-expand (expr clauses)
   (let* ((const (macroexp-const-p expr))
          (sym (if const expr (make-symbol "var")))
          (clauses-1 (if const clauses
                       (cons `(let* ((,sym ,expr))) clauses))))
     (cl-loop
      for clause in clauses-1
-     collect (ucond-case--clause-desugar sym clause))))
+     collect (ucase--clause-desugar sym clause))))
 
-(defun ucond-case--clause-desugar (exprsym clause)
+(defun ucase--clause-desugar (exprsym clause)
   (pcase clause
     (`(let* . ,rest) (ucond--clause-let*-desugar rest))
-    (`(case ,expr . ,rest)
+    (`(ucase ,expr . ,rest)
      (ucond--clause-and-desugar
-      '((_ t)) `(:and-ucond-case ,expr ,@rest)))
-    (`(cond . ,rest)
+      '((_ t)) `(:and-ucase ,expr ,@rest)))
+    (`(ucond . ,rest)
      (ucond--clause-and-desugar
       '((_ t)) `(:and-ucond ,@rest)))
     (`(,pattern . ,rest)
