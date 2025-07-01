@@ -15,13 +15,15 @@
 
 ;;; Code:
 
+;;;; Core
+
 (defmacro ucond--core (&rest cases)
   "The core language of `ucond'.
 CASES is a list of cases. Each case can take one of the forms:
 
-1. (case PATTERN EXPR THEN-BODY...).
-2. (let-else PATTERN EXPR ELSE-BODY...).
-3. (case-and-cond PATTERN EXPR NESTED-CASES).
+1. (c:then PATTERN EXPR THEN-BODY...).
+2. (c:else PATTERN EXPR ELSE-BODY...).
+3. (c:cond PATTERN EXPR NESTED-CASES).
 
 Every CASE has a PATTERN and a EXPR,
 and it will try to match PATTERN with EXPR,
@@ -29,28 +31,28 @@ using the `pcase' pattern language,
 as in (pcase EXPR (PATTERN THEN...) (_ ELSE...)).
 The difference is the control flow.
 
-In the case form, if PATTERN matches EXPR, execute THEN-BODY...,
+In the c:then form, if PATTERN matches EXPR, execute THEN-BODY...,
 and the rest CASES will be skipped.
 If PATTERN does not match EXPR, move on to the next CASE.
 This form works like a normal clause in `pcase'.
 
-In the let-else form, if PATTERN matches EXPR,
+In the c:else form, if PATTERN matches EXPR,
 it will continue to check the rest CASES,
 with the bindings in PATTERN available to the rest CASES.
 If PATTERN does not match EXPR, execute ELSE-BODY...,
 and the rest CASES will be skipped.
-This form is the dual of the case form.
+This form is the dual of the c:then form.
 The control flows are flipped.
 It works like the combination of bind* and pcase* clause in `cond*',
 with the additional ELSE-BODY for the failed match.
 
-In the case-and-cond form, if PATTERN matches EXPR,
+In the c:cond form, if PATTERN matches EXPR,
 start a nested `ucond--core' on NESTED-CASES at the inner level.
 The NESTED-CASES have the same forms of CASES.
 The execution of NESTED-CASES is also the same,
 except when all NESTED-CASES failed to match,
 the control will return to the outer level,
-that is, check the next CASE after this case-and-cond form.
+that is, check the next CASE after this c:cond form.
 In other words, this is a nested match
 which falls through to the outer match when no inner CASE matches.
 
@@ -59,7 +61,7 @@ to help understand its semantics.
 The translation is defined inductively on CASES.
 Each case introduces a new nested layer of `pcase'.
 
-The form (case PATTERN EXPR THEN-BODY...) can be translated to
+The form (c:then PATTERN EXPR THEN-BODY...) can be translated to
 
   (pcase EXPR
     (PATTERN THEN-BODY...)
@@ -69,7 +71,7 @@ where REST is (translate CASES FALL-THROUGH),
 that is, the translation of the rest CASES
 with potential outer FALL-THROUGH cases.
 
-The form (let-else PATTERN EXPR ELSE-BODY...) can be translated to
+The form (c:else PATTERN EXPR ELSE-BODY...) can be translated to
 
   (pcase EXPR
     (PATTERN REST)
@@ -79,7 +81,7 @@ where REST is the same as in the previous case.
 It is easy to see the bindings introduced by PATTERN
 are available to the rest cases.
 
-The form (case-and-cond PATTERN EXPR NESTED-CASES...) can be translated to
+The form (c:cond PATTERN EXPR NESTED-CASES...) can be translated to
 
   (pcase EXPR
     (PATTERN (translate NESTED-CASES REST))
@@ -98,18 +100,20 @@ translated by the algorithm in the documentation of `ucond--core'."
   (if (null cases) fallback
     (let ((rest (ucond--core-expand (cdr cases) fallback)))
       (pcase (car cases)
-        (`(case ,pattern ,expr . ,then)
+        (`(c:then ,pattern ,expr . ,then)
          `(pcase ,expr
             (,pattern ,@then)
             (_ ,rest)))
-        (`(let-else ,pattern ,expr . ,else)
+        (`(c:else ,pattern ,expr . ,else)
          `(pcase ,expr
             (,pattern ,rest)
             (_ ,@else)))
-        (`(case-and-cond ,pattern ,expr . ,nested-cases)
+        (`(c:cond ,pattern ,expr . ,nested-cases)
          `(pcase ,expr
             (,pattern ,(ucond--core-expand nested-cases rest))
             (_ ,rest)))))))
+
+;;;; Multiple bindings
 
 (defmacro ucond--bindings (&rest cases)
   "Allow multiple bindings for CASES in `ucond-core'."
@@ -119,21 +123,21 @@ translated by the algorithm in the documentation of `ucond--core'."
   (when cases
     (let ((rest (ucond--bindings-expand (cdr cases))))
       (pcase (car cases)
-        (`(case ,bindings . ,then)
-         (cons (ucond--bindings-case-expand bindings 'case then)
+        (`(b:then ,bindings . ,then)
+         (cons (ucond--bindings-case-expand bindings 'c:then then)
                rest))
-        (`(case-and-cond ,bindings . ,nested-cases)
+        (`(b:cond ,bindings . ,nested-cases)
          (cons (ucond--bindings-case-expand
-                bindings 'case-and-cond
+                bindings 'c:cond
                 (ucond--bindings-expand nested-cases))
                rest))
-        (`(let-else ,bindings . ,else)
+        (`(b:else ,bindings . ,else)
          (append
           (cl-loop
            for binding in bindings
            collect (pcase binding
                      (`(,pattern ,expr)
-                      `(let-else ,pattern ,expr ,@else))
+                      `(c:else ,pattern ,expr ,@else))
                      (_ (error "Unknown binding"))))
           rest))))))
 
@@ -143,10 +147,12 @@ translated by the algorithm in the documentation of `ucond--core'."
     (`((,pattern ,expr))
      `(,end ,pattern ,expr ,@code))
     (`((,pattern ,expr) . ,rest-bindings)
-     `(case-and-cond
+     `(c:cond
        ,pattern ,expr
        ,(ucond--bindings-case-expand rest-bindings end code)))
     (_ (error "Unknown binding"))))
+
+;;;; Sugar
 
 (defmacro ucond (&rest clauses)
   "TODO: Documentation."
@@ -169,7 +175,7 @@ translated by the algorithm in the documentation of `ucond--core'."
     (`(ucond . ,rest)
      (ucond--clause-and-desugar
       '((_ t)) `(:and-ucond ,@rest)))
-    (`(_ . ,rest) `(case ((_ nil)) ,@rest))
+    (`(_ . ,rest) `(b:then ((_ nil)) ,@rest))
     (_ (error "Unknown clause"))))
 
 (defun ucond--clause-let*-desugar (rest)
@@ -180,17 +186,17 @@ translated by the algorithm in the documentation of `ucond--core'."
                    ('nil nil)
                    (`(:otherwise . ,else) else)
                    (_ (error "Missing :otherwise in let")))))
-       `(let-else ,bindings ,@else)))
+       `(b:else ,bindings ,@else)))
     (_ (error "Unknown let* clause"))))
 
 (defun ucond--clause-and-desugar (bindings rest)
   (pcase rest
     (`(:and-ucond . ,cases)
-     `(case-and-cond ,bindings ,@(ucond--clauses-expand cases)))
+     `(b:cond ,bindings ,@(ucond--clauses-expand cases)))
     (`(:and-ucase ,expr . ,cases)
-     `(case-and-cond ,bindings
+     `(b:cond ,bindings
                      ,@(ucase--clauses-expand expr cases)))
-    (_ `(case ,bindings ,@rest))))
+    (_ `(b:then ,bindings ,@rest))))
 
 (defmacro ucase (expr &rest clauses)
   "TODO: Documentation."
