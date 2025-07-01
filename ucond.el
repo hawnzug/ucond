@@ -148,6 +148,36 @@ translated by the algorithm in the documentation of `ucond--core'."
        ,(ucond--bindings-case-expand rest-bindings end code)))
     (_ (error "Unknown binding"))))
 
+(defmacro ucond (&rest clauses)
+  "TODO: Documentation."
+  (cons 'ucond--bindings
+        (ucond--clauses-expand clauses)))
+
+(defun ucond--clauses-expand (clauses)
+  (mapcar #'ucond--clause-desugar clauses))
+
+(defun ucond--clause-desugar (clause)
+  (pcase clause
+    (`(let* ,bindings . ,rest)
+     (let ((else (pcase rest
+                   ('nil nil)
+                   (`(:otherwise . ,else) else)
+                   (_ (error "Missing :otherwise in let")))))
+       `(let-else ,bindings ,@else)))
+    (`(match* ,bindings . ,rest)
+     (pcase rest
+       (`(:and-ucond . ,cases)
+        `(case-and-cond ,bindings ,@(ucond--clauses-expand cases)))
+       (_ `(case ,bindings ,@rest))))
+    (`(when ,condition . ,rest)
+     (let ((bindings `(((guard ,condition) nil))))
+       (pcase rest
+         (`(:and-ucond . ,cases)
+          `(case-and-cond ,bindings ,@(ucond--clauses-expand cases)))
+         (_ `(case ,bindings ,@rest)))))
+    (`(_ . ,rest) `(case ((_ nil)) ,@rest))
+    (_ (error "Unknown clause"))))
+
 (provide 'ucond)
 
 ;;; ucond.el ends here
