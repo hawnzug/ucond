@@ -165,6 +165,7 @@ Each clause in CLAUSES can take one of the forms:
   (match* BINDINGS :and-ucond UCOND-CLAUSES)
   (match* BINDINGS :and-ucase EXPR UCASE-CLAUSES)
   (when CONDITION [:otherwise ELSE...])
+  (CONDITION)
   (CONDITION BODY...)
   (CONDITION :and-ucond UCOND-CLAUSES)
   (CONDITION :and-ucase EXPR UCASE-CLAUSES)
@@ -229,6 +230,8 @@ The (CONDITION BODY...) clause is exactly the same
 as a normal clause in the traditional `cond',
 except that the first expression in BODY cannot be
 :and-ucase or :and-ucond.
+The (CONDITION) clause is also the same as in `cond',
+which returns CONDITION's value when it is non-nil.
 To avoid any syntactic ambiguity,
 CONDITION cannot be any of let*, match*, when, ucond, or ucase.
 To work around, one can use (progn let*) in CONDITION, for example.
