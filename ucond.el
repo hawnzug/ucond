@@ -279,7 +279,28 @@ and (t :and-ucase EXP UCASE-CLAUSES) respectively."
     (_ `(b:then ,bindings ,@rest))))
 
 (defmacro ucase (expr &rest clauses)
-  "TODO: Documentation."
+  "Nested pcase with fall-through and interleaving let.
+The `ucase' construct is followed by an EXPR to match,
+and a list of CLAUSES.
+Return nil when CLAUSES is empty.
+Each clause in CLAUSES can take one of the forms:
+
+  (let* BINDINGS [:otherwise ELSE...])
+  (match* BINDINGS BODY...)
+  (match* BINDINGS :and-ucond UCOND-CLAUSES)
+  (match* BINDINGS :and-ucase UCASE-CLAUSES)
+  (when CONDITION [:otherwise ELSE...])
+  (PATTERN BODY...)
+  (PATTERN :and-ucond UCOND-CLAUSES)
+  (PATTERN :and-ucase EXP UCASE-CLAUSES)
+  (ucond UCOND-CLAUSES)
+  (ucase EXP UCASE-CLAUSES)
+
+All clauses have the same meaning as in `ucond',
+except for the three (PATTERN ...) clauses.
+The pattern clauses are equivalent to the match* clauses
+trying to match PATTERN with the value of EXPR,
+that is, (match* ((PATTERN VAL-EXPR)) ...)."
   (declare (indent 1))
   (cons 'ucond--bindings
         (ucase--clauses-expand expr clauses)))
