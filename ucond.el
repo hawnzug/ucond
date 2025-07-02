@@ -163,13 +163,13 @@ Each clause in CLAUSES can take one of the forms:
   (let* BINDINGS [:otherwise ELSE...])
   (match* BINDINGS BODY...)
   (match* BINDINGS :and-ucond UCOND-CLAUSES)
-  (match* BINDINGS :and-ucase UCASE-CLAUSES)
+  (match* BINDINGS :and-ucase EXPR UCASE-CLAUSES)
   (when CONDITION [:otherwise ELSE...])
   (CONDITION BODY...)
   (CONDITION :and-ucond UCOND-CLAUSES)
-  (CONDITION :and-ucase EXP UCASE-CLAUSES)
+  (CONDITION :and-ucase EXPR UCASE-CLAUSES)
   (ucond UCOND-CLAUSES)
-  (ucase EXP UCASE-CLAUSES)
+  (ucase EXPR UCASE-CLAUSES)
 
 Only the let* and match* clauses are essential.
 The rest clauses can be translated to let* or match* directly.
@@ -180,9 +180,9 @@ but it exits the `ucond' with ELSE if BINDINGS failed.
 It has a list of BINDINGS and an optional ELSE branch
 introduced by the :otherwise keyword.
 
-Like `pcase-let*', each binding in BINDINGS has the form (PATTERN EXP).
-EXP is evaluated and matched against PATTERN using `pcase'.
-If EXP matches PATTERN,
+Like `pcase-let*', each binding in BINDINGS has the form (PATTERN EXPR).
+EXPR is evaluated and matched against PATTERN using `pcase'.
+If EXPR matches PATTERN,
 the variables introduced by PATTERN will be available
 to the following BINDINGS.
 
@@ -211,10 +211,10 @@ if none of the inner clauses matches.
 BINDINGS are the same as in the let* clause.
 UCOND-CLAUSES are the same as the CLAUSES in `ucond'.
 
-The (match* BINDINGS :and-ucase EXP UCOND-CLAUSES) clause
+The (match* BINDINGS :and-ucase EXPR UCOND-CLAUSES) clause
 works similarly to the previous clause,
 but starts a nested `ucase' with fall-through.
-See `ucase' for more details on EXP and UCOND-CLAUSES.
+See `ucase' for more details on EXPR and UCOND-CLAUSES.
 
 The (when CONDITION [:otherwise ELSE...]) clause works
 similarly to the let* clause,
@@ -233,9 +233,9 @@ To avoid any syntactic ambiguity,
 CONDITION cannot be any of let*, match*, when, ucond, or ucase.
 To work around, one can use (progn let*) in CONDITION, for example.
 
-The (ucond UCOND-CLAUSES) and (ucase EXP UCASE-CLAUSES) clauses
+The (ucond UCOND-CLAUSES) and (ucase EXPR UCASE-CLAUSES) clauses
 are equivalent to (t :and-ucond UCOND-CLAUSES)
-and (t :and-ucase EXP UCASE-CLAUSES) respectively."
+and (t :and-ucase EXPR UCASE-CLAUSES) respectively."
   (cons 'ucond--bindings
         (ucond--clauses-expand clauses)))
 
@@ -288,13 +288,13 @@ Each clause in CLAUSES can take one of the forms:
   (let* BINDINGS [:otherwise ELSE...])
   (match* BINDINGS BODY...)
   (match* BINDINGS :and-ucond UCOND-CLAUSES)
-  (match* BINDINGS :and-ucase UCASE-CLAUSES)
+  (match* BINDINGS :and-ucase EXPR UCASE-CLAUSES)
   (when CONDITION [:otherwise ELSE...])
   (PATTERN BODY...)
   (PATTERN :and-ucond UCOND-CLAUSES)
-  (PATTERN :and-ucase EXP UCASE-CLAUSES)
+  (PATTERN :and-ucase EXPR-1 UCASE-CLAUSES)
   (ucond UCOND-CLAUSES)
-  (ucase EXP UCASE-CLAUSES)
+  (ucase EXPR-1 UCASE-CLAUSES)
 
 All clauses have the same meaning as in `ucond',
 except for the three (PATTERN ...) clauses.
