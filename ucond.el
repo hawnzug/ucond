@@ -243,31 +243,35 @@ and (t :and-ucase EXPR UCASE-CLAUSES) respectively."
   (mapcar #'ucond--clause-desugar clauses))
 
 (defun ucond--clause-desugar (clause)
+  (or
+   (ucond--common-desugar clause)
+   (pcase clause
+     (`(,condition)
+      (let ((sym (make-symbol "var")))
+        `(b:then (((and (pred (not null)) ,sym) ,condition)) ,sym)))
+     (`(,condition . ,rest)
+      `(b:then (((guard ,condition) t)) ,@rest))
+     (_ (error "Unknown clause")))))
+
+(defun ucond--common-desugar (clause)
+  "Desugar common CLAUSE in `ucond' and `ucase'."
   (pcase clause
-    (`(let* . ,rest) (ucond--clause-let*-desugar rest))
+    (`(let* ,bindings . ,rest)
+     (ucond--clause-else-desugar bindings rest))
     (`(match* ,bindings . ,rest)
      (ucond--clause-and-desugar bindings rest))
     (`(when ,condition . ,rest)
-     (ucond--clause-and-desugar `(((guard ,condition) nil)) rest))
+     (ucond--clause-else-desugar `(((guard ,condition))) rest))
     (`(ucase ,expr . ,rest)
-     (ucond--clause-and-desugar
-      '((_ t)) `(:and-ucase ,expr ,@rest)))
+     (ucond--clause-and-desugar '((_ t)) `(:and-ucase ,expr ,@rest)))
     (`(ucond . ,rest)
-     (ucond--clause-and-desugar
-      '((_ t)) `(:and-ucond ,@rest)))
-    (`(_ . ,rest) `(b:then ((_ nil)) ,@rest))
-    (_ (error "Unknown clause"))))
+     (ucond--clause-and-desugar '((_ t)) `(:and-ucond ,@rest)))))
 
-(defun ucond--clause-let*-desugar (rest)
-  ;; Unfortunately we cannot use ucond now.
-  (pcase rest
-    (`(,bindings . ,rest)
-     (let ((else (pcase rest
-                   ('nil nil)
-                   (`(:otherwise . ,else) else)
-                   (_ (error "Missing :otherwise in let")))))
-       `(b:else ,bindings ,@else)))
-    (_ (error "Unknown let* clause"))))
+(defun ucond--clause-else-desugar (bindings rest)
+  `(b:else ,bindings ,(pcase rest
+                        ('nil nil)
+                        (`(:otherwise . ,else) else)
+                        (_ (error "Missing :otherwise")))))
 
 (defun ucond--clause-and-desugar (bindings rest)
   (pcase rest
@@ -315,17 +319,12 @@ that is, (match* ((PATTERN VAL-EXPR)) ...)."
      collect (ucase--clause-desugar sym clause))))
 
 (defun ucase--clause-desugar (exprsym clause)
-  (pcase clause
-    (`(let* . ,rest) (ucond--clause-let*-desugar rest))
-    (`(ucase ,expr . ,rest)
-     (ucond--clause-and-desugar
-      '((_ t)) `(:and-ucase ,expr ,@rest)))
-    (`(ucond . ,rest)
-     (ucond--clause-and-desugar
-      '((_ t)) `(:and-ucond ,@rest)))
-    (`(,pattern . ,rest)
-     (ucond--clause-and-desugar `((,pattern ,exprsym)) rest))
-    (_ (error "Unknown clause"))))
+  (or
+   (ucond--common-desugar clause)
+   (pcase clause
+     (`(,pattern . ,rest)
+      (ucond--clause-and-desugar `((,pattern ,exprsym)) rest))
+     (_ (error "Unknown clause")))))
 
 (provide 'ucond)
 
