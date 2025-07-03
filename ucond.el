@@ -271,10 +271,10 @@ and (t :and-ucase EXPR UCASE-CLAUSES) respectively."
      (ucond--clause-and-desugar '((_ t)) `(:and-ucond ,@rest)))))
 
 (defun ucond--clause-else-desugar (bindings rest)
-  `(b:else ,bindings ,(pcase rest
-                        ('nil nil)
-                        (`(:otherwise . ,else) else)
-                        (_ (error "Missing :otherwise")))))
+  `(b:else ,bindings ,@(pcase rest
+                         ('nil nil)
+                         (`(:otherwise . ,else) else)
+                         (_ (error "Missing :otherwise")))))
 
 (defun ucond--clause-and-desugar (bindings rest)
   (pcase rest
