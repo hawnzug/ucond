@@ -90,4 +90,5 @@
                   (match* ((0 0))
                     :and-ucond
                     (let* ((1 1))))
-                  (match* ((2 2)) 'yes)))))
+                  (match* ((2 2)) 'yes))
+                 'yes)))

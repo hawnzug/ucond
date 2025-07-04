@@ -71,15 +71,28 @@ are no long vaild after the fall-through to the outer level."
             (pcase ,expr
               (,pattern (cl-return-from ,return (progn ,@then))))
             ,rest))
-        (`(c:else ,pattern ,expr . ,else)
-         `(pcase ,expr
-            (,pattern ,rest)
-            (_ (cl-return-from ,return (progn ,@else)))))
+        (`(c:else ,bindings . ,else)
+         (let ((sym-else (make-symbol "else")))
+           `(when (eq ',sym-else
+                      ,(ucond--core-else-expand bindings rest sym-else))
+              (cl-return-from ,return (progn ,@else)))))
         (`(c:cond ,pattern ,expr . ,nested-cases)
          `(progn
             (pcase ,expr
               (,pattern ,(ucond--core-expand nested-cases return)))
             ,rest))))))
+
+(defun ucond--core-else-expand (bindings rest sym-else)
+  (pcase bindings
+    (`((,pattern ,expr))
+     `(pcase ,expr
+        (,pattern ,rest)
+        (_ ',sym-else)))
+    (`((,pattern ,expr) . ,rest-bindings)
+     `(pcase ,expr
+        (,pattern ,(ucond--core-else-expand rest-bindings rest sym-else))
+        (_ ',sym-else)))
+    (_ (error "Unknown binding"))))
 
 ;;;; Multiple bindings
 
@@ -100,8 +113,7 @@ are no long vaild after the fall-through to the outer level."
                 (ucond--bindings-expand nested-cases))
                rest))
         (`(b:else ,bindings . ,else)
-         (list (ucond--bindings-case-expand bindings 'c:cond rest)
-               `(c:then _ t ,@else)))))))
+         (cons `(c:else ,bindings ,else) rest))))))
 
 (defun ucond--bindings-case-expand (bindings end code)
   "Expand BINDINGS to and-cond followed by END CODE."
