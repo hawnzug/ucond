@@ -55,49 +55,14 @@ the control will return to the outer level,
 that is, check the next CASE after this c:cond form.
 In other words, this is a nested match
 which falls through to the outer match when no inner CASE matches.
-
-The `ucond--core' construct can be translated to `pcase' in a direct way,
-to help understand its semantics.
-The translation is defined inductively on CASES.
-Each case introduces a new nested layer of `pcase'.
-
-The form (c:then PATTERN EXPR THEN-BODY...) can be translated to
-
-  (pcase EXPR
-    (PATTERN THEN-BODY...)
-    (_ REST))
-
-where REST is (translate CASES FALL-THROUGH),
-that is, the translation of the rest CASES
-with potential outer FALL-THROUGH cases.
-
-The form (c:else PATTERN EXPR ELSE-BODY...) can be translated to
-
-  (pcase EXPR
-    (PATTERN REST)
-    (_ ELSE-BODY...))
-
-where REST is the same as in the previous case.
-It is easy to see the bindings introduced by PATTERN
-are available to the rest cases.
-
-The form (c:cond PATTERN EXPR NESTED-CASES...) can be translated to
-
-  (pcase EXPR
-    (PATTERN (translate NESTED-CASES REST))
-    (_ REST))
-
-where REST is the same as in the previous case.
-The REST cases become the fall-through cases
-in the translation of NESTED-CASES."
+Note that the variables introduced by c:else in NESTED-CASES
+are no long vaild after the fall-through to the outer level."
   (declare (indent nil))
   (let ((return (make-symbol "ucond")))
     `(cl-block ,return ,(ucond--core-expand cases return))))
 
 (defun ucond--core-expand (cases return)
-  "Expand CASES, fall through to FALLBACK.
-The code after expansion should behaves the same as the one
-translated by the algorithm in the documentation of `ucond--core'."
+  "Expand CASES, exit to RETURN."
   (when cases
     (let ((rest (ucond--core-expand (cdr cases) return)))
       (pcase (car cases)
