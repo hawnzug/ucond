@@ -26,4 +26,5 @@
                  '(3 4)))
   (should (equal (ucond (let* ((1 2)) :otherwise 3)) 3))
   (should (equal (ucond (let* ((x 1) (2 x)) :otherwise 3) (t x)) 3))
+  (should (equal (ucond (let* ((x 1))) (let* ((2 x)) :otherwise x)) 1))
   (should-error (ucond (let* ((x 1) (2 x)) :otherwise x))))
