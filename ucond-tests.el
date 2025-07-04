@@ -24,6 +24,6 @@
                   (let* ((x 3)))
                   ((= x 3) (list x y)))
                  '(3 4)))
-  ;; (should-error (ucond (let* ((x 1) (2 x)) :otherwise x)))
   (should (equal (ucond (let* ((1 2)) :otherwise 3)) 3))
-  (should (equal (ucond (let* ((x 1) (2 x)) :otherwise 3) (t x)) 3)))
+  (should (equal (ucond (let* ((x 1) (2 x)) :otherwise 3) (t x)) 3))
+  (should-error (ucond (let* ((x 1) (2 x)) :otherwise x))))
