@@ -27,7 +27,16 @@
   (should (equal (ucond (let* ((1 2)) :otherwise 3)) 3))
   (should (equal (ucond (let* ((x 1) (2 x)) :otherwise 3) (t x)) 3))
   (should (equal (ucond (let* ((x 1))) (let* ((2 x)) :otherwise x)) 1))
-  (should-error (ucond (let* ((x 1) (2 x)) :otherwise x))))
+  (should-error (ucond (let* ((x 1) (2 x)) :otherwise x)))
+  (should (equal (ucond
+                  (let* ((x 1)))
+                  (let* ((x 2) (3 4)) :otherwise x))
+                 1))
+  (should (equal (ucond
+                  (let* ((x 1) (x 2)))
+                  (let* ((x 3) (x 4)))
+                  (t x))
+                 4)))
 
 (ert-deftest ucond-tests-match* ()
   (should-error (ucond (match* () t)))

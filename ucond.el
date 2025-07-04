@@ -113,7 +113,7 @@ are no long vaild after the fall-through to the outer level."
                 (ucond--bindings-expand nested-cases))
                rest))
         (`(b:else ,bindings . ,else)
-         (cons `(c:else ,bindings ,else) rest))))))
+         (cons `(c:else ,bindings ,@else) rest))))))
 
 (defun ucond--bindings-case-expand (bindings end code)
   "Expand BINDINGS to and-cond followed by END CODE."
