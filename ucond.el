@@ -22,7 +22,7 @@
 CASES is a list of cases. Each case can take one of the forms:
 
 1. (c:then PATTERN EXPR THEN-BODY...).
-2. (c:else PATTERN EXPR ELSE-BODY...).
+2. (c:else BINDINGS ELSE-BODY...).
 3. (c:cond PATTERN EXPR NESTED-CASES).
 
 Every CASE has a PATTERN and a EXPR,
@@ -36,15 +36,12 @@ and the rest CASES will be skipped.
 If PATTERN does not match EXPR, move on to the next CASE.
 This form works like a normal clause in `pcase'.
 
-In the c:else form, if PATTERN matches EXPR,
-it will continue to check the rest CASES,
-with the bindings in PATTERN available to the rest CASES.
-If PATTERN does not match EXPR, execute ELSE-BODY...,
-and the rest CASES will be skipped.
-This form is the dual of the c:then form.
-The control flows are flipped.
-It works like the combination of bind* and pcase* clause in `cond*',
-with the additional ELSE-BODY for the failed match.
+In the c:else form, the BINDINGS is a list of bindings of the form
+(PATTREN EXPR).  It runs the pattern matchings sequentially, like a list
+of c:then forms.  The difference is when all the pattern matchings
+succeeded, it proceeds to the rest CASES with these bindings available,
+and when any of the pattern matchings failed, it exits the `ucond--core'
+with ELSE.
 
 In the c:cond form, if PATTERN matches EXPR,
 start a nested `ucond--core' on NESTED-CASES at the inner level.
