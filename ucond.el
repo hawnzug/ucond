@@ -135,14 +135,8 @@ translated by the algorithm in the documentation of `ucond--core'."
                 (ucond--bindings-expand nested-cases))
                rest))
         (`(b:else ,bindings . ,else)
-         (append
-          (cl-loop
-           for binding in bindings
-           collect (pcase binding
-                     (`(,pattern ,expr)
-                      `(c:else ,pattern ,expr ,@else))
-                     (_ (error "Unknown binding"))))
-          rest))))))
+         (list (ucond--bindings-case-expand bindings 'c:cond rest)
+               `(c:then _ t ,@else)))))))
 
 (defun ucond--bindings-case-expand (bindings end code)
   "Expand BINDINGS to and-cond followed by END CODE."
