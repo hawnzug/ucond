@@ -91,27 +91,30 @@ where REST is the same as in the previous case.
 The REST cases become the fall-through cases
 in the translation of NESTED-CASES."
   (declare (indent nil))
-  (ucond--core-expand cases nil))
+  (let ((return (make-symbol "ucond")))
+    `(cl-block ,return ,(ucond--core-expand cases return))))
 
-(defun ucond--core-expand (cases fallback)
+(defun ucond--core-expand (cases return)
   "Expand CASES, fall through to FALLBACK.
 The code after expansion should behaves the same as the one
 translated by the algorithm in the documentation of `ucond--core'."
-  (if (null cases) fallback
-    (let ((rest (ucond--core-expand (cdr cases) fallback)))
+  (when cases
+    (let ((rest (ucond--core-expand (cdr cases) return)))
       (pcase (car cases)
         (`(c:then ,pattern ,expr . ,then)
-         `(pcase ,expr
-            (,pattern ,@then)
-            (_ ,rest)))
+         `(progn
+            (pcase ,expr
+              (,pattern (cl-return-from ,return (progn ,@then))))
+            ,rest))
         (`(c:else ,pattern ,expr . ,else)
          `(pcase ,expr
             (,pattern ,rest)
-            (_ ,@else)))
+            (_ (cl-return-from ,return (progn ,@else)))))
         (`(c:cond ,pattern ,expr . ,nested-cases)
-         `(pcase ,expr
-            (,pattern ,(ucond--core-expand nested-cases rest))
-            (_ ,rest)))))))
+         `(progn
+            (pcase ,expr
+              (,pattern ,(ucond--core-expand nested-cases return)))
+            ,rest))))))
 
 ;;;; Multiple bindings
 
