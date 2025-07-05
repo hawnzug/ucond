@@ -56,7 +56,7 @@ Note that the variables introduced by c:else in NESTED-CASES
 are no long vaild after the fall-through to the outer level."
   (declare (indent nil))
   (let ((return (make-symbol "ucond")))
-    `(cl-block ,return ,(ucond--core-expand cases return))))
+    `(cl-block ,return ,@(ucond--core-expand cases return))))
 
 (defun ucond--core-expand (cases return)
   "Expand CASES, exit to RETURN."
@@ -64,28 +64,28 @@ are no long vaild after the fall-through to the outer level."
     (let ((rest (ucond--core-expand (cdr cases) return)))
       (pcase (car cases)
         (`(c:then ,pattern ,expr . ,then)
-         `(progn
-            (pcase ,expr
-              (,pattern (cl-return-from ,return (progn ,@then))))
-            ,rest))
+         (cons
+          `(pcase ,expr
+             (,pattern (cl-return-from ,return (progn ,@then))))
+          rest))
         (`(c:else ,bindings . ,else)
          (if else
              (let* ((sym-else (make-symbol "else"))
                     (ex (ucond--core-else-expand bindings rest sym-else)))
-               `(when (eq ',sym-else ,ex)
-                  (cl-return-from ,return (progn ,@else))))
-           (ucond--core-else-expand bindings rest nil)))
+               (list `(when (eq ',sym-else ,ex)
+                        (cl-return-from ,return (progn ,@else)))))
+           (list (ucond--core-else-expand bindings rest nil))))
         (`(c:cond ,pattern ,expr . ,nested-cases)
-         `(progn
-            (pcase ,expr
-              (,pattern ,(ucond--core-expand nested-cases return)))
-            ,rest))))))
+         (cons
+          `(pcase ,expr
+             (,pattern ,@(ucond--core-expand nested-cases return)))
+          rest))))))
 
 (defun ucond--core-else-expand (bindings rest sym-else)
   (pcase bindings
     (`((,pattern ,expr))
      `(pcase ,expr
-        (,pattern ,rest)
+        (,pattern ,@rest)
         ,@(when sym-else `((_ ',sym-else)))))
     (`((,pattern ,expr) . ,rest-bindings)
      `(pcase ,expr
