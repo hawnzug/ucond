@@ -69,12 +69,12 @@ are no long vaild after the fall-through to the outer level."
               (,pattern (cl-return-from ,return (progn ,@then))))
             ,rest))
         (`(c:else ,bindings . ,else)
-         (let* ((sym-else (make-symbol "else"))
-                (ex (ucond--core-else-expand bindings rest sym-else)))
-           (if else
+         (if else
+             (let* ((sym-else (make-symbol "else"))
+                    (ex (ucond--core-else-expand bindings rest sym-else)))
                `(when (eq ',sym-else ,ex)
-                  (cl-return-from ,return (progn ,@else)))
-             ex)))
+                  (cl-return-from ,return (progn ,@else))))
+           (ucond--core-else-expand bindings rest nil)))
         (`(c:cond ,pattern ,expr . ,nested-cases)
          `(progn
             (pcase ,expr
@@ -86,11 +86,11 @@ are no long vaild after the fall-through to the outer level."
     (`((,pattern ,expr))
      `(pcase ,expr
         (,pattern ,rest)
-        (_ ',sym-else)))
+        ,@(when sym-else `((_ ',sym-else)))))
     (`((,pattern ,expr) . ,rest-bindings)
      `(pcase ,expr
         (,pattern ,(ucond--core-else-expand rest-bindings rest sym-else))
-        (_ ',sym-else)))
+        ,@(when sym-else `((_ ',sym-else)))))
     (_ (error "Unknown binding"))))
 
 ;;;; Multiple bindings
