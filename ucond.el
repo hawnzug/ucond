@@ -69,10 +69,12 @@ are no long vaild after the fall-through to the outer level."
               (,pattern (cl-return-from ,return (progn ,@then))))
             ,rest))
         (`(c:else ,bindings . ,else)
-         (let ((sym-else (make-symbol "else")))
-           `(when (eq ',sym-else
-                      ,(ucond--core-else-expand bindings rest sym-else))
-              (cl-return-from ,return (progn ,@else)))))
+         (let* ((sym-else (make-symbol "else"))
+                (ex (ucond--core-else-expand bindings rest sym-else)))
+           (if else
+               `(when (eq ',sym-else ,ex)
+                  (cl-return-from ,return (progn ,@else)))
+             ex)))
         (`(c:cond ,pattern ,expr . ,nested-cases)
          `(progn
             (pcase ,expr
@@ -163,7 +165,8 @@ available to the following CLAUSES, that is, the rest in `ucond'.
 If any matching fails, exit the `ucond' by running ELSE...
 and return the value of the last of the ELSE's.
 When there is no :otherwise, or when ELSE... has zero expression,
-it defaults to :otherwise nil.
+it exits the current level of `ucond' and falls through if possible.
+See the match* clause for details about fall-through.
 
 The (match* BINDINGS BODY...) clause tries to make BINDINGS
 and exits the `ucond' with BODY,

@@ -100,4 +100,16 @@
                     :and-ucond
                     (let* ((1 1))))
                   (match* ((2 2)) 'yes))
+                 'yes))
+  (should (equal (ucond
+                  (match* ((0 0))
+                    :and-ucond
+                    (let* ((1 3))))
+                  (match* ((2 2)) 'yes))
+                 'yes))
+  (should (equal (ucond
+                  (match* ((0 0))
+                    :and-ucond
+                    (let* ((1 3)) :otherwise 'yes))
+                  (match* ((2 2)) 'no))
                  'yes)))
