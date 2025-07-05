@@ -113,3 +113,19 @@
                     (let* ((1 3)) :otherwise 'yes))
                   (match* ((2 2)) 'no))
                  'yes)))
+
+(ert-deftest ucond-tests-when ()
+  (should (equal (ucond
+                  (when nil)
+                  (t 'no))
+                 nil))
+  (should (equal (ucond
+                  (when nil :otherwise 'yes)
+                  (t 'no))
+                 'yes))
+  (should (equal (ucond
+                  (ucond
+                   (when nil)
+                   (t (error "when")))
+                  (t 'yes))
+                 'yes)))

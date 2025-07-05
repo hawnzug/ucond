@@ -238,7 +238,7 @@ and (t :and-ucase EXPR UCASE-CLAUSES) respectively."
     (`(match* ,bindings . ,rest)
      (ucond--clause-and-desugar bindings rest))
     (`(when ,condition . ,rest)
-     (ucond--clause-else-desugar `(((guard ,condition))) rest))
+     (ucond--clause-else-desugar `(((guard ,condition) t)) rest))
     (`(ucase ,expr . ,rest)
      (ucond--clause-and-desugar '((_ t)) `(:and-ucase ,expr ,@rest)))
     (`(ucond . ,rest)
