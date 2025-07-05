@@ -129,3 +129,13 @@
                    (t (error "when")))
                   (t 'yes))
                  'yes)))
+
+(ert-deftest ucond-tests-ucase ()
+  (should (equal (ucond
+                  (let* ((x 1)))
+                  (ucase x
+                    (2 'no)
+                    (let* ((x 2)))
+                    (2 'nono)
+                    ((pred (= x)) 'x)
+                    ((pred (= (1- x))) 'yes))))))
