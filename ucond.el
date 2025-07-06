@@ -62,26 +62,45 @@ are no long vaild after the fall-through to the outer level."
          (ft-next (or ft-current (make-symbol "fall-through"))))
     (if (null cases)
         `',ft-current
-      (let ((rest (ucond--core-expand (cdr cases) ft-current)))
-        (pcase (car cases)
-          (`(c:then ,pattern ,expr . ,then)
+      (pcase (car cases)
+        (`(c:then ,pattern ,expr . ,then)
+         (pcase-let ((`(,clauses . ,rest-cases)
+                      (ucond--core-thens-expand
+                       pattern expr then (cdr cases))))
            `(pcase ,expr
-              (,pattern ,@then)
-              (_ ,rest)))
-          (`(c:else ,bindings . ,else)
-           (let ((sym-body (make-symbol "body"))
-                 (ex (ucond--core-else-expand bindings rest ft-current)))
-             `(let ((,sym-body ,ex))
-                (if (eq ',ft-current ,sym-body)
-                    ,@(or else (list `',ft-current))
-                  ,sym-body))))
-          (`(c:cond ,pattern ,expr . ,nested-cases)
-           (let* ((sym-body (make-symbol "body")))
-             `(let ((,sym-body
-                     (pcase ,expr
-                       (,pattern ,(ucond--core-expand nested-cases ft-next))
-                       (_ ',ft-next))))
-                (if (eq ',ft-next ,sym-body) ,rest ,sym-body)))))))))
+              ,@clauses
+              (_ ,(ucond--core-expand rest-cases ft-current)))))
+        (`(c:else ,bindings . ,else)
+         (let ((sym-body (make-symbol "body")))
+           `(let ((,sym-body
+                   ,(ucond--core-else-expand
+                     bindings
+                     (ucond--core-expand (cdr cases) ft-current)
+                     ft-current)))
+              (if (eq ',ft-current ,sym-body)
+                  ,@(or else (list `',ft-current))
+                ,sym-body))))
+        (`(c:cond ,pattern ,expr . ,nested-cases)
+         (let* ((sym-body (make-symbol "body")))
+           `(let ((,sym-body
+                   (pcase ,expr
+                     (,pattern ,(ucond--core-expand nested-cases ft-next))
+                     (_ ',ft-next))))
+              (if (eq ',ft-next ,sym-body)
+                  ,(ucond--core-expand (cdr cases) ft-current)
+                ,sym-body))))))))
+
+(defun ucond--core-thens-expand (pattern expr then cases)
+  (let ((loop t)
+        (clauses (list `(,pattern ,@then))))
+    (while loop
+      (pcase cases
+        ((and `((c:then ,pattern-1 ,expr-1 . ,then-1) . ,rest-cases)
+              (guard (eq expr expr-1))) ; TODO: equal?
+         (push `(,pattern-1 ,@then-1) clauses)
+         (setq cases rest-cases))
+        (_ (setq loop nil))))
+    (cons (nreverse clauses) cases)))
 
 (defun ucond--core-else-expand (bindings rest sym-else)
   (pcase bindings
