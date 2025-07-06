@@ -15,6 +15,8 @@
 
 ;;; Code:
 
+(eval-when-compile (require 'cl-macs))
+
 ;;;; Core
 
 (defmacro ucond--core (&rest cases)
