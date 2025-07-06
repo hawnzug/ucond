@@ -58,37 +58,32 @@ are no long vaild after the fall-through to the outer level."
   (ucond--core-expand cases nil))
 
 (defun ucond--core-expand (cases fall-through)
-  (let* ((ft-current fall-through)
-         (ft-next (or ft-current (make-symbol "fall-through"))))
-    (if (null cases)
-        `',ft-current
-      (pcase (car cases)
-        (`(c:then ,pattern ,expr . ,then)
-         (pcase-let ((`(,clauses . ,rest-cases)
-                      (ucond--core-thens-expand
-                       pattern expr then (cdr cases))))
-           `(pcase ,expr
-              ,@clauses
-              (_ ,(ucond--core-expand rest-cases ft-current)))))
-        (`(c:else ,bindings . ,else)
-         (let ((sym-body (make-symbol "body")))
-           `(let ((,sym-body
-                   ,(ucond--core-else-expand
-                     bindings
-                     (ucond--core-expand (cdr cases) ft-current)
-                     ft-current)))
-              (if (eq ',ft-current ,sym-body)
-                  ,@(or else (list `',ft-current))
-                ,sym-body))))
-        (`(c:cond ,pattern ,expr . ,nested-cases)
-         (let* ((sym-body (make-symbol "body")))
-           `(let ((,sym-body
-                   (pcase ,expr
-                     (,pattern ,(ucond--core-expand nested-cases ft-next))
-                     (_ ',ft-next))))
-              (if (eq ',ft-next ,sym-body)
-                  ,(ucond--core-expand (cdr cases) ft-current)
-                ,sym-body))))))))
+  (pcase cases
+    ('nil `',fall-through)
+    (`((c:then ,pattern ,expr . ,then) . ,cases)
+     (pcase-let ((`(,clauses . ,cases)
+                  (ucond--core-thens-expand pattern expr then cases)))
+       `(pcase ,expr
+          ,@clauses
+          (_ ,(ucond--core-expand cases fall-through)))))
+    (`((c:else ,bindings . ,else) . ,cases)
+     (let ((sym-body (make-symbol "body"))
+           (rest (ucond--core-expand cases fall-through)))
+       `(let ((,sym-body
+               ,(ucond--core-else-expand bindings rest fall-through)))
+          (if (eq ',fall-through ,sym-body)
+              ,@(or else (list `',fall-through))
+            ,sym-body))))
+    (`((c:cond ,pattern ,expr . ,nested-cases) . ,cases)
+     (let ((rest (ucond--core-expand cases fall-through))
+           (sym-body (make-symbol "body"))
+           (ft-next (or fall-through
+                        (make-symbol "fall-through"))))
+       `(let ((,sym-body
+               (pcase ,expr
+                 (,pattern ,(ucond--core-expand nested-cases ft-next))
+                 (_ ',ft-next))))
+          (if (eq ',ft-next ,sym-body) ,rest ,sym-body))))))
 
 (defun ucond--core-thens-expand (pattern expr then cases)
   (let ((loop t)
