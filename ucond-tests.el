@@ -138,4 +138,5 @@
                     (let* ((x 2)))
                     (2 'nono)
                     ((pred (= x)) 'x)
-                    ((pred (= (1- x))) 'yes))))))
+                    ((pred (= (1- x))) 'yes)))
+                 'yes)))
