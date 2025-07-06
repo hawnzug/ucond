@@ -55,37 +55,38 @@ which falls through to the outer match when no inner CASE matches.
 Note that the variables introduced by c:else in NESTED-CASES
 are no long vaild after the fall-through to the outer level."
   (declare (indent nil))
-  (let ((return (make-symbol "ucond")))
-    `(cl-block ,return ,@(ucond--core-expand cases return))))
+  (ucond--core-expand cases nil))
 
-(defun ucond--core-expand (cases return)
-  "Expand CASES, exit to RETURN."
-  (when cases
-    (let ((rest (ucond--core-expand (cdr cases) return)))
-      (pcase (car cases)
-        (`(c:then ,pattern ,expr . ,then)
-         (cons
-          `(pcase ,expr
-             (,pattern (cl-return-from ,return (progn ,@then))))
-          rest))
-        (`(c:else ,bindings . ,else)
-         (if else
-             (let* ((sym-else (make-symbol "else"))
-                    (ex (ucond--core-else-expand bindings rest sym-else)))
-               (list `(when (eq ',sym-else ,ex)
-                        (cl-return-from ,return (progn ,@else)))))
-           (list (ucond--core-else-expand bindings rest nil))))
-        (`(c:cond ,pattern ,expr . ,nested-cases)
-         (cons
-          `(pcase ,expr
-             (,pattern ,@(ucond--core-expand nested-cases return)))
-          rest))))))
+(defun ucond--core-expand (cases fall-through)
+  (let* ((ft-current fall-through)
+         (ft-next (or ft-current (make-symbol "fall-through"))))
+    (if (null cases)
+        `',ft-current
+      (let ((rest (ucond--core-expand (cdr cases) ft-current)))
+        (pcase (car cases)
+          (`(c:then ,pattern ,expr . ,then)
+           `(pcase ,expr
+              (,pattern ,@then)
+              (_ ,rest)))
+          (`(c:else ,bindings . ,else)
+           (let ((sym-body (make-symbol "body"))
+                 (ex (ucond--core-else-expand bindings rest ft-current)))
+             `(let ((,sym-body ,ex))
+                (if (eq ',ft-current ,sym-body)
+                    ,@(or else (list `',ft-current))
+                  ,sym-body))))
+          (`(c:cond ,pattern ,expr . ,nested-cases)
+           (let* ((sym-body (make-symbol "body")))
+             `(let ((,sym-body
+                     (pcase ,expr
+                       (,pattern ,(ucond--core-expand nested-cases ft-next)))))
+                (if (eq ',ft-next ,sym-body) ,rest ,sym-body)))))))))
 
 (defun ucond--core-else-expand (bindings rest sym-else)
   (pcase bindings
     (`((,pattern ,expr))
      `(pcase ,expr
-        (,pattern ,@rest)
+        (,pattern ,rest)
         ,@(when sym-else `((_ ',sym-else)))))
     (`((,pattern ,expr) . ,rest-bindings)
      `(pcase ,expr
