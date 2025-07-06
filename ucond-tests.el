@@ -57,6 +57,10 @@
                     (match* ((y (1+ x))) (list x y))))
                  '(1 2)))
   (should (equal (ucond
+                  (match* ((0 1)) :and-ucond (t 'no))
+                  (t 'yes))
+                 'yes))
+  (should (equal (ucond
                   (match* ((x 1))
                     :and-ucond
                     (match* ((0 1)) 'a)

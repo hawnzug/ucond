@@ -79,7 +79,8 @@ are no long vaild after the fall-through to the outer level."
            (let* ((sym-body (make-symbol "body")))
              `(let ((,sym-body
                      (pcase ,expr
-                       (,pattern ,(ucond--core-expand nested-cases ft-next)))))
+                       (,pattern ,(ucond--core-expand nested-cases ft-next))
+                       (_ ',ft-next))))
                 (if (eq ',ft-next ,sym-body) ,rest ,sym-body)))))))))
 
 (defun ucond--core-else-expand (bindings rest sym-else)
