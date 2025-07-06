@@ -62,8 +62,9 @@ are no long vaild after the fall-through to the outer level."
     ('nil `',fall-through)
     (`((c:then ,pattern ,expr . ,then) . ,cases)
      (pcase-let ((`(,clauses . ,cases)
-                  (ucond--core-thens-expand pattern expr then cases)))
+                  (ucond--core-thens-expand expr cases)))
        `(pcase ,expr
+          (,pattern ,@then)
           ,@clauses
           (_ ,(ucond--core-expand cases fall-through)))))
     (`((c:else ,bindings . ,else) . ,cases)
@@ -85,14 +86,13 @@ are no long vaild after the fall-through to the outer level."
                  (_ ',ft-next))))
           (if (eq ',ft-next ,sym-body) ,rest ,sym-body))))))
 
-(defun ucond--core-thens-expand (pattern expr then cases)
-  (let ((loop t)
-        (clauses (list `(,pattern ,@then))))
+(defun ucond--core-thens-expand (expr cases)
+  (let ((loop t) (clauses nil))
     (while loop
       (pcase cases
-        ((and `((c:then ,pattern-1 ,expr-1 . ,then-1) . ,rest-cases)
+        ((and `((c:then ,pattern ,expr-1 . ,then) . ,rest-cases)
               (guard (eq expr expr-1))) ; TODO: equal?
-         (push `(,pattern-1 ,@then-1) clauses)
+         (push `(,pattern ,@then) clauses)
          (setq cases rest-cases))
         (_ (setq loop nil))))
     (cons (nreverse clauses) cases)))
