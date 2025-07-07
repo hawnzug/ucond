@@ -146,10 +146,9 @@ are no long vaild after the fall-through to the outer level."
 ;;;; Sugar
 
 (defmacro ucond (&rest clauses)
-  "Nested cond with fall-through, pcase, and interleaving let.
-The `ucond' construct is followed by a list of CLAUSES.
-Return nil when CLAUSES is empty.
-Each clause in CLAUSES can take one of the forms:
+  "Nested and interleaving cond, pcase, and let* with else.
+A `ucond' construct consists of a list of CLAUSES.  Return nil when
+CLAUSES is empty.  Each clause in CLAUSES can take one of the forms:
 
   (let* BINDINGS [:otherwise ELSE...])
   (match* BINDINGS BODY...)
@@ -163,74 +162,78 @@ Each clause in CLAUSES can take one of the forms:
   (ucond UCOND-CLAUSES)
   (ucase EXPR UCASE-CLAUSES)
 
-Only the let* and match* clauses are essential.
-The rest clauses can be translated to let* or match* directly.
+where brackets mean optional.  Only the let* and match* clauses are
+essential.  The rest clauses can be translated to let* or match*
+directly.
 
-The (let* BINDINGS [:otherwise ELSE...]) clause
-tries to make the BINDINGS available to the following clauses,
-but it exits the `ucond' with ELSE if BINDINGS failed.
-It has a list of BINDINGS and an optional ELSE branch
-introduced by the :otherwise keyword.
+A `ucond' construct can have nested ucond-like constructs, introduced by
+the `ucond' clause, or by the :and-ucond keyword, for example, in the
+match* clause.  In this documentation, these nested constructs will also
+be called (inner) `ucond'.  And when we explain the meaning of a clause,
+the clause might belong to the top-level `ucond' or a nested `ucond'.
 
-Like `pcase-let*', each binding in BINDINGS has the form (PATTERN EXPR).
-EXPR is evaluated and matched against PATTERN using `pcase'.
-If EXPR matches PATTERN,
-the variables introduced by PATTERN will be available
-to the following BINDINGS.
+The (let* BINDINGS [:otherwise ELSE...]) clause tries to make the
+BINDINGS available to the clauses and nested sub-clauses after this let*
+clause in the current `ucond'.  If BINDINGS failed, it exits the outmost
+`ucond' with ELSE, or it falls through to the outer `ucond' when there
+is no ELSE.
 
-If all the matchings succeed, all the variables introduced will be
-available to the following CLAUSES, that is, the rest in `ucond'.
-If any matching fails, exit the `ucond' by running ELSE...
-and return the value of the last of the ELSE's.
-When there is no :otherwise, or when ELSE... has zero expression,
-it exits the current level of `ucond' and falls through if possible.
-See the match* clause for details about fall-through.
+The let* clause consists of a list of BINDINGS and an optional ELSE
+branch introduced by the :otherwise keyword.  Each binding in BINDINGS
+has the form (PATTERN EXPR), just like in `pcase-let*'.  EXPR is
+evaluated and matched against PATTERN using `pcase'.  If EXPR matches
+PATTERN, the variables introduced by PATTERN will be available to the
+following BINDINGS.
 
-The (match* BINDINGS BODY...) clause tries to make BINDINGS
-and exits the `ucond' with BODY,
-but if BINDINGS failed, it proceeds to the following clauses.
-BINDINGS are the same as in the let* clause.
+If all the matchings succeeded, all the variables introduced will be
+available to the following clauses and nested sub-clauses in the current
+`ucond'.  If any matching failed, exit the outmost `ucond' with ELSE.
+However, when there is no :otherwise, or when ELSE is empty, it exits
+the current level of `ucond' and falls through to the outer level.  If
+there is no outer level, return nil.  See the match* :and-ucond clause
+for details about fall-through.
 
-The (match* BINDINGS :and-ucond UCOND-CLAUSES) clause
-tries to make BINDINGS, and if it succeeded,
-insert the UCOND-CLAUSES into the `ucond' after this clause
-with BINDINGS available locally,
-and proceeds to the new following clauses.
-Otherwise proceeds to the current following clauses directly.
-In other words, if the BINDINGS succeeded,
-starts a nested `ucond' with BINDINGS,
-but will fall through to the outer clauses
-if none of the inner clauses matches.
-BINDINGS are the same as in the let* clause.
-UCOND-CLAUSES are the same as the CLAUSES in `ucond'.
+The (match* BINDINGS BODY...) clause works like the let* clause, but
+with the control flow flipped.  If BINDINGS succeeded, execute BODY with
+all the variables introduced by BINDINGS available, and exit the outmost
+`ucond' with the value of BODY.  If BINDINGS failed, proceed to the
+following clauses.  BINDINGS are the same as in the let* clause.
 
-The (match* BINDINGS :and-ucase EXPR UCOND-CLAUSES) clause
-works similarly to the previous clause,
-but starts a nested `ucase' with fall-through.
-See `ucase' for more details on EXPR and UCOND-CLAUSES.
+The (match* BINDINGS :and-ucond UCOND-CLAUSES) clause works similarly to
+a nested `ucond' in a match*: (match* BINDINGS (ucond UCOND-CLAUSES)).
+The difference is that, if BINDINGS succeeded,
+the (match* BINDINGS (ucond UCOND-CLAUSES)) clause will always exits
+the outmost `ucond' with the value of the inner `ucond',
+but (match* BINDINGS :and-ucond UCOND-CLAUSES) might fall through from
+the inner `ucond' and proceed to the following clauses.  Fall-through
+to the outer level can happen in one of these cases:
+1. All clauses have been tried, but none exits and returns a value.
+2. A let* or when clause failed, but it has no ELSE branch to return.
 
-The (when CONDITION [:otherwise ELSE...]) clause works
-similarly to the let* clause,
-except that BINDINGS are replaced by a single CONDITION expression.
+The (match* BINDINGS :and-ucase EXPR UCASE-CLAUSES) clause works
+similarly to the previous :and-ucond clause, but starts a nested `ucase'
+with fall-through.  See `ucase' for more details on EXPR and
+UCASE-CLAUSES.
+
+The (when CONDITION [:otherwise ELSE...]) clause works similarly to the
+let* clause, except that BINDINGS are replaced by a single CONDITION.
 It is equivalent to (let* (((guard CONDITION) t)) [:otherwise ELSE...]),
 that is, a let* with only one binding checking if CONDITION is non-nil.
 
-The (CONDITION ...) family works
-similarly to the (match* BINDINGS ...) family.
-It is equivalent to (match* (((guard CONDITION) t)) ...).
-The (CONDITION BODY...) clause is exactly the same
-as a normal clause in the traditional `cond',
-except that the first expression in BODY cannot be
-:and-ucase or :and-ucond.
-The (CONDITION) clause is also the same as in `cond',
-which returns CONDITION's value when it is non-nil.
-To avoid any syntactic ambiguity,
-CONDITION cannot be any of let*, match*, when, ucond, or ucase.
-To work around, one can use (progn let*) in CONDITION, for example.
+The (CONDITION ...) family works similarly to the (match* BINDINGS ...)
+family.  It is equivalent to (match* (((guard CONDITION) t)) ...).
+The (CONDITION BODY...) clause is exactly the same as a normal clause in
+the traditional `cond', except that the first expression in BODY cannot
+be :and-ucase or :and-ucond.  The (CONDITION) clause is also the same as
+in `cond', which returns CONDITION's value when it is non-nil.  To avoid
+any syntactic ambiguity, CONDITION cannot be any of let*, match*, when,
+ucond, or ucase.  To work around, one can use (progn let*) as CONDITION,
+for example.
 
-The (ucond UCOND-CLAUSES) and (ucase EXPR UCASE-CLAUSES) clauses
-are equivalent to (t :and-ucond UCOND-CLAUSES)
-and (t :and-ucase EXPR UCASE-CLAUSES) respectively."
+The (ucond UCOND-CLAUSES) and (ucase EXPR UCASE-CLAUSES) clauses are
+equivalent to (t :and-ucond UCOND-CLAUSES) and (t :and-ucase EXPR
+UCASE-CLAUSES) respectively.  See `ucase' for more details on EXPR and
+UCASE-CLAUSES."
   (cons 'ucond--bindings
         (ucond--clauses-expand clauses)))
 
