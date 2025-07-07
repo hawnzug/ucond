@@ -146,7 +146,7 @@ are no long vaild after the fall-through to the outer level."
 ;;;; Sugar
 
 (defmacro ucond (&rest clauses)
-  "Nested and interleaving cond, pcase, and let* with else.
+  "Nested and interleaved cond, pcase, and let* with else.
 A `ucond' construct consists of a list of CLAUSES.  Return nil when
 CLAUSES is empty.  Each clause in CLAUSES can take one of the forms:
 
@@ -202,7 +202,7 @@ following clauses.  BINDINGS are the same as in the let* clause.
 The (match* BINDINGS :and-ucond UCOND-CLAUSES) clause works similarly to
 a nested `ucond' in a match*: (match* BINDINGS (ucond UCOND-CLAUSES)).
 The difference is that, if BINDINGS succeeded,
-the (match* BINDINGS (ucond UCOND-CLAUSES)) clause will always exits
+the (match* BINDINGS (ucond UCOND-CLAUSES)) clause will always exit
 the outmost `ucond' with the value of the inner `ucond',
 but (match* BINDINGS :and-ucond UCOND-CLAUSES) might fall through from
 the inner `ucond' and proceed to the following clauses.  Fall-through
@@ -281,11 +281,10 @@ UCASE-CLAUSES."
     (_ `(b:then ,bindings ,@rest))))
 
 (defmacro ucase (expr &rest clauses)
-  "Nested pcase with fall-through and interleaving let.
-The `ucase' construct is followed by an EXPR to match,
-and a list of CLAUSES.
-Return nil when CLAUSES is empty.
-Each clause in CLAUSES can take one of the forms:
+  "Nested and interleaved pcase, cond, and let* with else.
+The `ucase' construct consists of an EXPR to match, and a list of
+CLAUSES.  Return nil when CLAUSES is empty.  Each clause in CLAUSES
+can take one of the forms:
 
   (let* BINDINGS [:otherwise ELSE...])
   (match* BINDINGS BODY...)
@@ -298,11 +297,18 @@ Each clause in CLAUSES can take one of the forms:
   (ucond UCOND-CLAUSES)
   (ucase EXPR-1 UCASE-CLAUSES)
 
-All clauses have the same meaning as in `ucond',
-except for the three (PATTERN ...) clauses.
-The pattern clauses are equivalent to the match* clauses
-trying to match PATTERN with the value of EXPR,
-that is, (match* ((PATTERN VAL-EXPR)) ...)."
+All the clauses, except for the three (PATTERN ...) clauses, have the
+same meaning as in `ucond'.  It is recommended to read the documentation
+of `ucond' first.
+
+As in `ucond', all the nested ucase-like constructs will also be called
+`ucase' in this documentation.  They are introduced by the (ucase ...)
+clause, and the :and-ucase keyword.  The fall-through in `ucase' works
+the same as in `ucond'.
+
+The (PATTERN ...) clauses are equivalent to the match* clauses with a
+single binding (PATTERN VAL-EXPR), where VAL-EXPR is the value of EXPR,
+and EXPR is the expression introduced by the closest `ucase'."
   (declare (indent 1))
   (cons 'ucond--bindings
         (ucase--clauses-expand expr clauses)))
