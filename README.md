@@ -13,6 +13,7 @@ Let's look at some quick comparisons to see how `ucond` and `ucase` flatten prog
 before diving into the details of their syntax and semantics.
 
 - **Before**: Nested `pcase` and `cond` for destructuring bindings and comprehensive error handling.
+
   ``` elisp
   (pcase (get-a-pair)
     (`(,x1 . ,x2)
@@ -230,7 +231,55 @@ or read the section [Full Reference](#full-reference).
 
 ## Full Reference
 
-## Comparisons
+## Similar Constructs in Other Languages
+
+This section is intended for readers familiar with other languages,
+and want to relate `ucond` and `ucase` to existing language features.
+It is not necessary to read this section to learn how this package works,
+and it might be full of obscure terminologies specific to particular languages.
+
+The most distinctive feature of `ucond` and `ucase` is the interleaved `(let* ... :otherwise ...)` construct within multi-way if (`cond`) and pattern matching.
+At first glance, this construct is similar to the [`let-else`](https://github.com/rust-lang/rfcs/blob/master/text/3137-let-else.md) in Rust
+and the [`guard-let-else`](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/controlflow#Early-Exit) in Swift.
+But they differ in important ways.
+
+In Rust and Swift,
+these constructs are only used within a sequential construct,
+that is, a sequence of statements.
+They are not interleaved in a branching construct like multi-way if or pattern matching.
+Therefore their `else` blocks must always diverge, for example, return, break, or error.
+
+On the other hand, the `let* :otherwise` clause in this package is used in a branching construct,
+so it allows the `:otherwise` branch to contain any expressions or fall through.
+It can be viewed as a generalization of `let-else` in a nested branching construct.
+
+Without `:otherwise` in `let*`, this package is almost the same as
+[The Ultimate Conditional Syntax](https://dl.acm.org/doi/10.1145/3689746) in MLscript,
+if we disregard its ML-like and indentation sensitive syntax.
+Actually this paper is a major inspiration of this package.
+
+The nested and interleaved `ucond` and `ucase` with fall-throughs can be viewed as the nested guards in Haskell
+(though not yet implemented), see
+[these](https://stackoverflow.com/questions/28526768/is-there-in-haskell-something-similar-to-sub-guards)
+[three](https://stackoverflow.com/questions/34124558/is-it-possible-to-nest-guards-in-haskell)
+[questions](https://stackoverflow.com/questions/40334968/nested-guards-on-haskell) for examples.
+Note that Haskell's chained guards and interleaved let-bindings in guards
+are different from nested guards and interleaved `let*` between clauses.
+
+OCaml does not support nested guards, but there is an extensive
+[discussion](https://discuss.ocaml.org/t/musings-on-extended-pattern-matching-syntaxes/3600) about it,
+proposing a syntax similar to `ucase`.
+
+Scala also has a similar [proposal](https://github.com/scala/scala3/discussions/17728) for nested patterns in guards.
+
+Agda's `with` is a clean syntax (but it's more than that)
+for nested guards (on the left), but it has no fall-through behavior.
+
+Racket does not support nested guards directly,
+but can easily implement this feature using labelled branches ([`=> id`](https://docs.racket-lang.org/reference/match.html))
+and manually escaping to labels.
+It offers more freedom and works like a goto in a pattern matching.
+This feature is also listed as a todo in the source code of `pcase`.
 
 ## Caveats and Non-Goals
 
@@ -254,6 +303,7 @@ This package does **not** provide:
   Ultimately, `ucond` and `ucase` are conditional constructs that form a tree-like structure,
   and they will choose one branch to execute.
   It might be tempting to define a macro like `ucond-defun`:
+
   ``` elisp
   (ucond-defun func (args...)
     "Docstring"
