@@ -154,6 +154,7 @@ CLAUSES is empty.  Each clause in CLAUSES can take one of the forms:
   (match* BINDINGS BODY...)
   (match* BINDINGS :and-ucond UCOND-CLAUSES)
   (match* BINDINGS :and-ucase EXPR UCASE-CLAUSES)
+  (when-let* VARLIST [:otherwise ELSE...])
   (when CONDITION [:otherwise ELSE...])
   (CONDITION)
   (CONDITION BODY...)
@@ -215,10 +216,15 @@ similarly to the previous :and-ucond clause, but starts a nested `ucase'
 with fall-through.  See `ucase' for more details on EXPR and
 UCASE-CLAUSES.
 
+The (when-let* VARLIST [:otherwise ELSE...]) clause works similarly to
+the let* clause, except that each element of VARLIST is a list (SYMBOL
+VALUEFORM), same as the built-in `when-let*'.  It is equivalent
+to (let* (((and VAR (guard VAR)) EXPR)...) [:otherwise ELSE...]).
+
 The (when CONDITION [:otherwise ELSE...]) clause works similarly to the
 let* clause, except that BINDINGS are replaced by a single CONDITION.
 It is equivalent to (let* (((guard CONDITION) t)) [:otherwise ELSE...]),
-that is, a let* with only one binding checking if CONDITION is non-nil.
+or it is equivalent to (when-let* ((_ CONDITION)) [:otherwise ELSE...]).
 
 The (CONDITION ...) family works similarly to the (match* BINDINGS ...)
 family.  It is equivalent to (match* (((guard CONDITION) t)) ...).
@@ -258,6 +264,11 @@ UCASE-CLAUSES."
      (ucond--clause-else-desugar bindings rest))
     (`(match* ,bindings . ,rest)
      (ucond--clause-and-desugar bindings rest))
+    (`(when-let* ,bindings . ,rest)
+     (ucond--clause-else-desugar
+      (cl-loop for (var expr) in bindings
+               collect `((and ,var (guard ,var)) ,expr))
+      rest))
     (`(when ,condition . ,rest)
      (ucond--clause-else-desugar `(((guard ,condition) t)) rest))
     (`(ucase ,expr . ,rest)
@@ -290,6 +301,7 @@ can take one of the forms:
   (match* BINDINGS BODY...)
   (match* BINDINGS :and-ucond UCOND-CLAUSES)
   (match* BINDINGS :and-ucase EXPR UCASE-CLAUSES)
+  (when-let* VARLIST [:otherwise ELSE...])
   (when CONDITION [:otherwise ELSE...])
   (PATTERN BODY...)
   (PATTERN :and-ucond UCOND-CLAUSES)

@@ -134,6 +134,14 @@
                   (t 'yes))
                  'yes)))
 
+(ert-deftest ucond-tests-when-let* ()
+  (should (equal (ucond (when-let* ((x nil)) :otherwise 'yes)) 'yes))
+  (should (equal (ucond
+                  (when-let* ((x 1) (y (1+ x))) :otherwise 'no)
+                  (x y))
+                 2))
+  (should-error (ucond (when-let* ((x 1) (y nil)) :otherwise x))))
+
 (ert-deftest ucond-tests-ucase ()
   (should (equal (ucond
                   (let* ((x 1)))
