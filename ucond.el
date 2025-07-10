@@ -100,16 +100,29 @@ are no long vaild after the fall-through to the outer level."
     (cons (nreverse clauses) cases)))
 
 (defun ucond--core-else-expand (bindings rest sym-else)
-  (pcase bindings
-    (`((,pattern ,expr))
-     `(pcase ,expr
-        (,pattern ,rest)
-        ,@(when sym-else `((_ ',sym-else)))))
-    (`((,pattern ,expr) . ,rest-bindings)
-     `(pcase ,expr
-        (,pattern ,(ucond--core-else-expand rest-bindings rest sym-else))
-        ,@(when sym-else `((_ ',sym-else)))))
-    (_ (error "Unknown binding"))))
+  (let ((loop t) varlist main)
+    (while loop
+      (pcase bindings
+        ('nil
+         ;; TODO: Warn about unused else.
+         (setq loop nil
+               main (if (null varlist) rest
+                      `(let* ,(nreverse varlist) ,rest))))
+        (`((,pattern ,expr) . ,rest-bindings)
+         (if (symbolp pattern)
+             (progn
+               (push `(,pattern ,expr) varlist)
+               (setq bindings rest-bindings))
+           (let ((case
+                  `(pcase ,expr
+                     (,pattern ,(ucond--core-else-expand rest-bindings
+                                                         rest sym-else))
+                     ,@(when sym-else `((_ ',sym-else))))))
+             (setq loop nil
+                   main (if (null varlist) case
+                          `(let* ,(nreverse varlist) ,case))))))
+        (_ (error "Unknown binding"))))
+    main))
 
 ;;;; Multiple bindings
 
