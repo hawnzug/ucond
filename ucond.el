@@ -16,6 +16,7 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl-macs))
+(require 'macroexp)
 
 ;;;; Core
 
@@ -63,12 +64,19 @@ are no long vaild after the fall-through to the outer level."
   (pcase cases
     ('nil `',fall-through)
     (`((c:then ,pattern ,expr . ,then) . ,cases)
-     (pcase-let ((`(,clauses . ,cases)
-                  (ucond--core-thens-expand expr cases)))
-       `(pcase ,expr
-          (,pattern ,@then)
-          ,@clauses
-          (_ ,(ucond--core-expand cases fall-through)))))
+     (if (symbolp pattern)
+         (let ((main `(let ((,pattern ,expr)) ,@then)))
+           (if cases
+               (macroexp-warn-and-return
+                (format "cases shadowed by the pattern %S" pattern)
+                main nil nil pattern)
+             main))
+       (pcase-let ((`(,clauses . ,cases)
+                    (ucond--core-thens-expand expr cases)))
+         `(pcase ,expr
+            (,pattern ,@then)
+            ,@clauses
+            (_ ,(ucond--core-expand cases fall-through))))))
     (`((c:else ,bindings . ,else) . ,cases)
      (let ((sym-body (make-symbol "body"))
            (rest (ucond--core-expand cases fall-through)))
@@ -78,22 +86,25 @@ are no long vaild after the fall-through to the outer level."
               ,@(or else (list `',fall-through))
             ,sym-body))))
     (`((c:cond ,pattern ,expr . ,nested-cases) . ,cases)
-     (let ((rest (ucond--core-expand cases fall-through))
-           (sym-body (make-symbol "body"))
-           (ft-next (or fall-through
-                        (make-symbol "fall-through"))))
-       `(let ((,sym-body
-               (pcase ,expr
-                 (,pattern ,(ucond--core-expand nested-cases ft-next))
-                 (_ ',ft-next))))
+     (let* ((rest (ucond--core-expand cases fall-through))
+            (sym-body (make-symbol "body"))
+            (ft-next (or fall-through
+                         (make-symbol "fall-through")))
+            (nested (ucond--core-expand nested-cases ft-next))
+            (body (if (symbolp pattern)
+                      `(let ((,pattern ,expr)) ,nested)
+                    `(pcase ,expr (,pattern ,nested) (_ ',ft-next)))))
+       `(let ((,sym-body ,body))
           (if (eq ',ft-next ,sym-body) ,rest ,sym-body))))))
 
 (defun ucond--core-thens-expand (expr cases)
   (let ((loop t) (clauses nil))
     (while loop
       (pcase cases
-        ((and `((c:then ,pattern ,expr-1 . ,then) . ,rest-cases)
-              (guard (eq expr expr-1))) ; TODO: equal?
+        (`((c:then ,(and pattern (pred (not symbolp)))
+                   ,(pred (eq expr)) ; TODO: equal?
+                   . ,then)
+           . ,rest-cases)
          (push `(,pattern ,@then) clauses)
          (setq cases rest-cases))
         (_ (setq loop nil))))
