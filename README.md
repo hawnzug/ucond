@@ -286,13 +286,16 @@ This feature is also listed as a todo in the source code of `pcase`.
 ### Caveats
 - Performance might degrade with deeply nested `ucond` and `ucase` that could fall through,
   roughly one `if` and `eq` per level, compared to a direct `goto`, which is not available in Elisp.
-- The byte-compiler might warn about a `pcase` pattern being shadowed.
-  This will not affect correctness, but the issue should be fixed if possible.
 - In some cases, `cond` might be compiled to a jump table,
   but a direct translation to `ucond` might not be,
   which would make `ucond` slower.
 - Some Emacs keywords like `let*` and `when` are overloaded in `ucond` and `ucase`, which might lead to confusion.
   Keywords like `:otherwise` might seem unfamiliar to Elisp users.
+- ~~The byte-compiler might warn about a `pcase` pattern being shadowed.
+  This will not affect correctness, but the issue should be fixed if possible.~~
+  This package should no longer generate shadowed patterns.
+  If you see such warnings and there are no shadowed patterns in your code,
+  please open an issue.
 
 ### Non-Goals
 
