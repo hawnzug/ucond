@@ -2,15 +2,37 @@
 
 [![Test](https://github.com/hawnzug/ucond/actions/workflows/test.yml/badge.svg)](https://github.com/hawnzug/ucond/actions/workflows/test.yml)
 
+## Overview
+
 This package provides two macros, `ucond` and `ucase`,
 which extend the built-in `cond` and `pcase` with more flexible control flows:
-- Nested and interleaved `cond` and `pcase`, where inner constructs can fall through to outer levels.
-- Interleaved `pcase-let*` with an else branch and an option to fall through.
+- Mutually nested and interleaved `ucond` and `ucase`, where inner constructs can fall through to the outer level.
+
+  ``` elisp
+  (ucase (list 1 2 3 4)         ; Start a pattern matching like pcase.
+    (`(1 2 . ,rest)             ; Matched, then
+     :and-ucase (length rest)   ; start a nested pattern matching.
+     (0 'error-1)               ; Not matched. Move next.
+     (1 'error-2))              ; Not matched. Fall through to outer ucase.
+    (`(1 . ,_) 'yes))           ; Match. Return 'yes.
+  ```
+- Interleaved `let*`,
+  which works like `pcase-let*` with an otherwise branch and an option to fall through to the outer level.
+
+  ``` elisp
+  (ucond                                ; Start a multi-way if like cond.
+   (let* ((x 1) (y (1+ x))))            ; Bind x and y.
+   ((> x y) 'error-1)
+   (let* (`(,a ,b ,c ,d) (list x y))    ; Failed to bind a, b, c, d,
+     :otherwise (error-2 x y))          ; return the :otherwise branch.
+   ((< x y) 0))
+  ```
+
+## Motivation
 
 The primary motivation for `ucond` and `ucase` is to flatten nested code
 while maintaining or even improving the program's readability and clarity.
-Let's look at some quick comparisons to see how `ucond` and `ucase` flatten programs,
-before diving into the details of their syntax and semantics.
+Here are some quick comparisons to see how `ucond` and `ucase` flatten programs.
 
 - **Before**: Nested `pcase` and `cond` for destructuring bindings and comprehensive error handling.
 
@@ -23,8 +45,8 @@ before diving into the details of their syntax and semantics.
          ((test-a x1 x2 x3) 'a)
          ((test-b x1) 'b)
          (t 'error-3)))
-       (_ 'error-2)))
-    (_ 'error-1))
+       (_ 'error-2)))    ; Error handling far away from pattern,
+    (_ 'error-1))        ; and written in reversed order.
   ```
   **After**: Flattened by `ucond` and interleaved `let*` with early returns.
   ``` elisp
@@ -67,8 +89,8 @@ before diving into the details of their syntax and semantics.
        (pcase (compute-something x1)
          (`(case1 ,x2) (f1 x1 x2))
          (`(case2 ,x2 ,x3) (f2 x1 x2 x3))
-         (_ (fallback))))
-      (_ (fallback))))
+         (_ (fallback))))    ; Cannot jump to the next clause
+      (_ (fallback))))       ; in the outer pcase directly.
   ```
   **After**: Simplified by nested `ucase` and `:and-ucase` with fall-through.
   ``` elisp
@@ -226,10 +248,13 @@ with a pre-condition (or pre-pattern),
 and the fall-through behavior is the same.
 
 These examples should cover the common uses of `ucond` and `ucase`.
-For a complete reference, see the docstrings of `ucond` and `ucase`,
-or read the section [Full Reference](#full-reference).
+For a complete reference, see the docstrings of `ucond` and `ucase`.
 
-## Full Reference
+### Two Primitives: `let*` and `match*`
+All the clauses available in `ucond` and `ucase` are based on two primitive clauses,
+`let*` and `match*`, which provide opposite control flows.
+
+### Quick Reference of Available Clauses
 
 ## Similar Constructs in Other Languages
 
@@ -255,8 +280,8 @@ It can be viewed as a generalization of `let-else` in a nested branching constru
 
 Without `:otherwise` in `let*`, this package is almost the same as
 [The Ultimate Conditional Syntax](https://dl.acm.org/doi/10.1145/3689746) in MLscript,
-if we disregard its ML-like and indentation sensitive syntax.
-Actually this paper is a major inspiration of this package.
+if we ignore its ML-like and indentation sensitive syntax and focus on the abstract syntax.
+In fact, this paper is a major inspiration of this package.
 
 The nested and interleaved `ucond` and `ucase` with fall-throughs can be viewed as the nested guards in Haskell
 (though not yet implemented), see
