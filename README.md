@@ -247,14 +247,123 @@ They work like a directly nested `ucond` (or `ucase`)
 with a pre-condition (or pre-pattern),
 and the fall-through behavior is the same.
 
-These examples should cover the common uses of `ucond` and `ucase`.
-For a complete reference, see the docstrings of `ucond` and `ucase`.
+These examples should give you a feel for how to use `ucond` and `ucase` in practice.
+If you just need a quick reference, see the built-in docstrings for `ucond` and `ucase`.
+For a deep dive into the core mechanics, read the [Complete Guide](#complete-guide) below.
 
-### Two Primitives: `let*` and `match*`
-All the clauses available in `ucond` and `ucase` are based on two primitive clauses,
+## Complete Guide
+
+### Overall Structure and Control Flow
+
+As shown in the examples above, `ucond` and `ucase` look like the built-in constructs `cond` and `pcase`:
+``` elisp
+(ucond CLAUSE...)
+(ucase EXPR CLAUSE...)
+```
+The key difference is that
+there are special clauses which can introduce nested `ucond` and `ucase`,
+forming a single tree-like conditional structure.
+For example:
+``` elisp
+(ucond                                 ; A nesting can be introduced by:
+ (ucase EXPR CLAUSE...)                ; the ucase clause,
+ (CONDITION :and-ucase EXPR CLAUSE...) ; the :and-ucase keyword,
+ (ucond CLAUSE...)                     ; the ucond clause,
+ (CONDITION :and-ucond CLAUSE...))     ; the :and-ucond keyword.
+```
+It is important to distinguish this single nested tree from a standard nested form:
+``` elisp
+(ucond
+ (CONDITION (ucond CLAUSE...))) ; This is not ucond's nesting.
+```
+This is not a single tree but two separate `ucond`.
+The inner `ucond` is the body of the `CONDITION` clause, not a sub-clause of the outer `ucond`.
+Their macro expansions are independent.
+
+There are three basic control-flow rules of `ucond` and `ucase`:
+1. **Top-to-Bottom**: Just like `cond` and `pcase`, clauses are executed sequentially.
+1. **First-Success**: Only the first clause that successfully runs its body will *return* a value,
+   which becomes the value of the entire top-level construct.
+1. **Fall-Through**: When the control flow reaches the end of an inner block,
+   it falls through to the next clause in the parent block.
+   If it is alreadly at the outmost block, the entire construct evaluates to `nil`.
+
+The first two rules are the same in `cond` and `pcase`.
+The third "Fall Through" rule is a natural generalization of the "Top-to-Bottom" execution in a nested setting.
+
+### Primitive Clauses
+
+All the clauses available in `ucond` and `ucase` can be built upon two primitives,
 `let*` and `match*`, which provide opposite control flows.
 
-### Quick Reference of Available Clauses
+The `let*` clause works like a guard.
+The subsequent clauses will only be executed when pattern matchings in `let*` succeed.
+
+Syntax: `(let* ((PATTERN EXPR)...) [:otherwise BODY...])`, where the `:otherwise ...` branch is optional.
+- If all patterns match, the control flow moves to the next clause,
+  and the bindings are made available to all subsequent clauses
+  within the current `ucond` or `ucase`.
+- If any pattern fails to match:
+  - If the `:otherwise` branch is non-empty, return the value of `BODY...`.
+  - If there is no `:otherwise` branch, or `BODY` is empty, end the current `ucond` or `ucase` and fall through to the parent block.
+
+The `match*` clause works like a standard case in `pcase`,
+which executes its body when the pattern matchings succeed.
+
+Syntax: `(match* ((PATTERN EXPR)...) BODY...)`.
+- If any pattern fails to match, the control flow moves to the next clause after `match*`.
+- If all patterns match, make the bindings available to `BODY...` and run it.
+  `BODY...` has three variations:
+  - If `BODY...` is `:and-ucond CLAUSES...`, start a nested `ucond` with `CLAUSES`.
+  - If `BODY...` is `:and-ucase EXPR-1 CLAUSES...`, start a nested `ucase` with the expression `EXPR-1` and `CLAUSES`.
+  - Otherwise, return `BODY...`.
+
+The flexibility of `ucond` and `ucase` comes from combining these opposite behaviors.
+| Condition | Control Flow of `let*` | Control Flow of `match*` |
+| :--- | :--- | :--- |
+| Patterns Match | To next clause (with new bindings) | To body (with new bindings) |
+| Patterns Fail  | To `:otherwise` (or fall through) | To next clause |
+
+### Derivable Clauses
+
+All other clauses can be derived from either `let*` or `match*`.
+
+Clauses based on `let*` (`OTHERWISE` represents the optional `:otherwise ELSE...` branch):
+- `(when-let* ((VAR EXPR)...) OTHERWISE)`: A `let*` that also checks the bound variables are non-nil.
+  Analog to the built-in `when-let*`.
+  - Equivalent to `(let* (((and VAR (guard VAR)) EXPR)...) OTHERWISE)`.
+- `(when CONDITION OTHERWISE)`: A `let*` that only checks one condition is non-nil.
+  Analog to the built-in `when`.
+  - Equivalent to `(let* (((guard CONDITION) t)) OTHERWISE)`.
+
+Clauses based on `match*` (`BODY...` can begin with `:and-ucond` or `:and-ucase` to start nesting):
+- `(ucond CLAUSES)`: Starts a nested `ucond` block.
+  - Equivalent to `(match* ((_ t)) :and-ucond CLAUSES)`.
+- `(ucase EXPR CLAUSES)`: Starts a nested `ucase` block.
+  - Equivalent to `(match* ((_ t)) :and-ucase EXPR CLAUSES)`.
+- In `ucond`, `(CONDITION BODY...)` is the standard `cond`-like clause.
+  - Equivalent to `(match* (((guard CONDITION) t)) BODY...)`.
+  - When `BODY...` is empty, as in `(CONDITION)`,
+    the value of `CONDITION` is returned (only evaluated once).
+    This is for compatibility with `cond`.
+- In `ucase`, `(PATTERN BODY...)` is the standard `pcase`-like clause.
+  - Equivalent to `(match* ((PATTERN VAL-EXPR)) BODY...)`,
+    where `VAL-EXPR` is the value of the expression matched by `ucase`,
+    that is, the first argument of `ucase`.
+
+Below is a table summarizing all derivable clauses and their equivalent forms in `let*` or `match*`:
+| Derivable Clause                        | Equivalent Form in Primitive Clause                  |
+|-----------------------------------------|------------------------------------------------------|
+| `(when-let* ((VAR EXPR)...) OTHERWISE)` | `(let* (((and VAR (guard VAR)) EXPR)...) OTHERWISE)` |
+| `(when CONDITION OTHERWISE)`            | `(let* (((guard CONDITION) t)) OTHERWISE)`           |
+| `(ucond CLAUSES)`                       | `(match* ((_ t)) :and-ucond CLAUSES)`                |
+| `(ucase EXPR CLAUSES)`                  | `(match* ((_ t)) :and-ucase EXPR CLAUSES)`           |
+| `(PATTERN BODY...)`                     | `(match* ((PATTERN EXPR)) BODY...)`                  |
+| `(CONDITION BODY...)`                   | `(match* (((guard CONDITION) t)) BODY...)`           |
+| `(CONDITION)`                           | `(match* (((and x (guard x)) CONDITION)) x)`         |
+
+**Note**: The equivalent forms are only shown to clarify their semantics.
+The actual implementation might differ.
 
 ## Similar Constructs in Other Languages
 
