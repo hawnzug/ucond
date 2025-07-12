@@ -415,6 +415,38 @@ and manually escaping to labels.
 It offers more freedom and works like a goto in a pattern matching.
 This feature is also listed as a todo in the source code of `pcase`.
 
+## Comparision with `cond*` and `pcase`
+
+Emacs 31 added a new `cond*` construct which extends the traditional `cond`.
+It supports "non-exit clause" which works similar to the `let*` clause in this package,
+but it is non-exiting, so the control flow is more limited.
+There is no nested guards with fall-through in `cond*`.
+The `match*` keyword in this package is borrowed from `cond*`, but they have different behaviors.
+
+The built-in `pcase` does not support interleaved variable bindings like `let*`.
+However, it is actually possible to have nested guards with fall-through using the `or` pattern.
+For example, the following nested `ucase`
+``` elisp
+(ucase (list 1 2 3 4)
+  (`(1 . ,rest)
+   :and-ucase (reverse rest)
+   (`(2 ,x ,y) (+ x y))
+   (`(3 ,z) (* z z)))
+  (_ 'fallthrough))
+```
+is equivalent to this single `pcase`:
+``` elisp
+(pcase (list 1 2 3 4)
+  (`(1 . ,(app reverse
+               (or (and `(2 ,x ,y) (let ret (+ x y)))
+                   (and `(3 ,z) (let ret (* z z))))))
+   ret)
+  (_ 'fallthrough))
+```
+Although it is more verbose, the logic still looks clear.
+Scalability (more nesting and more branches) might be an issue,
+and using the `or` pattern in this way has the problem of making all bindings available to the body.
+
 ## Caveats and Non-Goals
 
 ### Caveats
